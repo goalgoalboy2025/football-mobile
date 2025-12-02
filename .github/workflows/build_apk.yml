@@ -16,21 +16,41 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Check Files & Install
+    - name: Auto-Fix Files
       run: |
-        echo "Checking file structure..."
-        ls -R
-        if [ -f "requirements.txt" ]; then
-          echo "Files found in root."
-          pip install -r requirements.txt
-        elif [ -f "football-mobile/requirements.txt" ]; then
-          echo "Files found in subfolder. Moving to root..."
-          cp -r football-mobile/* .
-          pip install -r requirements.txt
-        else
-          echo "Error: requirements.txt not found. Please upload your code files!"
+        echo "🔍 正在寻找代码文件..."
+        # 自动查找 main.py 的位置
+        MAIN_PATH=$(find . -name main.py | head -n 1)
+        
+        if [ -z "$MAIN_PATH" ]; then
+          echo "❌ 错误: 找不到 main.py！请确保您已上传代码。"
           exit 1
         fi
+        
+        DIR_NAME=$(dirname "$MAIN_PATH")
+        echo "✅ 在 [$DIR_NAME] 发现了代码"
+        
+        # 如果代码不在根目录，这就把它们搬过来
+        if [ "$DIR_NAME" != "." ]; then
+          echo "📦 正在移动文件到根目录..."
+          cp -r "$DIR_NAME"/* .
+        fi
+        
+        # 如果缺少依赖文件，自动创建一个
+        if [ ! -f "requirements.txt" ]; then
+          echo "⚠️ 未找到 requirements.txt，正在自动生成..."
+          echo "flet" > requirements.txt
+          echo "requests" >> requirements.txt
+          echo "beautifulsoup4" >> requirements.txt
+          echo "pytz" >> requirements.txt
+        fi
+        
+        echo "📂 文件准备就绪！"
+        ls -l
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
