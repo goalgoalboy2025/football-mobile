@@ -6,32 +6,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    # 升级到 v4
+    - uses: actions/checkout@v4
 
     - name: Setup Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
     - name: Prepare Code
       run: |
-        # 1. 智能查找 main.py
         MAIN_PATH=$(find . -name main.py | head -n 1)
         if [ -n "$MAIN_PATH" ]; then
            DIR_NAME=$(dirname "$MAIN_PATH")
            if [ "$DIR_NAME" != "." ]; then
-              echo "Moving files from $DIR_NAME to root..."
               cp -r "$DIR_NAME"/* .
            fi
         fi
         
-        # 2. 生成依赖文件
+        # 清理可能导致报错的图标引用
+        sed -i 's/icon=ft.Icons.REFRESH/icon=ft.Icons.REFRESH/g' main.py || true
+        sed -i 's/iconbitmap("football.ico")//g' main.py || true
+        
         echo "flet" > requirements.txt
         echo "requests" >> requirements.txt
         echo "beautifulsoup4" >> requirements.txt
@@ -40,21 +42,20 @@ jobs:
     - name: Install Dependencies
       run: pip install -r requirements.txt
 
-    # === 这里就是升级 Flutter 的地方 ===
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.22.0'  # <--- 我已经帮您改成了最新版
+        flutter-version: '3.22.0'
         channel: 'stable'
 
     - name: Flet Build APK
       run: |
-        # 增加 --no-android-splash 参数，避免因缺少启动图资源报错
-        flet build apk --verbose 
+        flet build apk --verbose
 
+    # 关键修改：升级到 v4
     - name: Upload APK
       if: success()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: football-app
         path: build/apk/app-release.apk
