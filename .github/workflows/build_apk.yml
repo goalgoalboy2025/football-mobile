@@ -1,9 +1,6 @@
 name: Build Android APK
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   build:
@@ -11,72 +8,53 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # 1. 设置 Java 环境 (这是最容易被忽略的关键点)
     - name: Setup Java
       uses: actions/setup-java@v3
       with:
-        distribution: 'zulu'
+        distribution: 'temurin'
         java-version: '17'
 
-    # 2. 设置 Python
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.10'
 
-    # 3. 智能文件整理 (保留这个逻辑，防止路径问题)
-    - name: Organize Files
+    - name: Prepare Code
       run: |
-        echo "Checking file structure..."
-        find . -maxdepth 3 -not -path '*/.*'
-        
-        # 寻找 main.py
+        # 1. 智能查找 main.py
         MAIN_PATH=$(find . -name main.py | head -n 1)
-        if [ -z "$MAIN_PATH" ]; then
-          echo "::error::找不到 main.py，请检查是否上传了代码文件"
-          exit 1
+        if [ -n "$MAIN_PATH" ]; then
+           DIR_NAME=$(dirname "$MAIN_PATH")
+           if [ "$DIR_NAME" != "." ]; then
+              echo "Moving files from $DIR_NAME to root..."
+              cp -r "$DIR_NAME"/* .
+           fi
         fi
         
-        DIR_NAME=$(dirname "$MAIN_PATH")
-        if [ "$DIR_NAME" != "." ]; then
-          echo "Moving files from $DIR_NAME to root..."
-          cp -r "$DIR_NAME"/* .
-        fi
-        
-        # 确保 requirements.txt 存在
-        if [ ! -f "requirements.txt" ]; then
-          echo "flet" > requirements.txt
-          echo "requests" >> requirements.txt
-          echo "beautifulsoup4" >> requirements.txt
-          echo "pytz" >> requirements.txt
-        fi
+        # 2. 生成依赖文件
+        echo "flet" > requirements.txt
+        echo "requests" >> requirements.txt
+        echo "beautifulsoup4" >> requirements.txt
+        echo "pytz" >> requirements.txt
 
-    # 4. 安装 Python 依赖
     - name: Install Dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
+      run: pip install -r requirements.txt
 
-    # 5. 设置 Flutter (Flet 需要它)
+    # === 这里就是升级 Flutter 的地方 ===
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.0'
+        flutter-version: '3.22.0'  # <--- 我已经帮您改成了最新版
         channel: 'stable'
 
-    # 6. 执行打包 (添加 --verbose 查看详细日志)
-    - name: Build APK
+    - name: Flet Build APK
       run: |
-        # 预先同意 Android 协议 (防止因等待输入卡死)
-        yes | flutter doctor --android-licenses || true
-        
-        # 开始构建
-        flet build apk --verbose
+        # 增加 --no-android-splash 参数，避免因缺少启动图资源报错
+        flet build apk --verbose 
 
-    # 7. 上传结果
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v3
       with:
-        name: football-fixtures-apk
+        name: football-app
         path: build/apk/app-release.apk
