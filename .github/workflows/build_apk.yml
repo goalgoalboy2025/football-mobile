@@ -11,57 +11,71 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    # 1. 设置 Java 环境 (这是最容易被忽略的关键点)
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    # 2. 设置 Python
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
 
-    - name: Auto-Fix Files
+    # 3. 智能文件整理 (保留这个逻辑，防止路径问题)
+    - name: Organize Files
       run: |
-        echo "🔍 正在寻找代码文件..."
-        # 自动查找 main.py 的位置
-        MAIN_PATH=$(find . -name main.py | head -n 1)
+        echo "Checking file structure..."
+        find . -maxdepth 3 -not -path '*/.*'
         
+        # 寻找 main.py
+        MAIN_PATH=$(find . -name main.py | head -n 1)
         if [ -z "$MAIN_PATH" ]; then
-          echo "❌ 错误: 找不到 main.py！请确保您已上传代码。"
+          echo "::error::找不到 main.py，请检查是否上传了代码文件"
           exit 1
         fi
         
         DIR_NAME=$(dirname "$MAIN_PATH")
-        echo "✅ 在 [$DIR_NAME] 发现了代码"
-        
-        # 如果代码不在根目录，这就把它们搬过来
         if [ "$DIR_NAME" != "." ]; then
-          echo "📦 正在移动文件到根目录..."
+          echo "Moving files from $DIR_NAME to root..."
           cp -r "$DIR_NAME"/* .
         fi
         
-        # 如果缺少依赖文件，自动创建一个
+        # 确保 requirements.txt 存在
         if [ ! -f "requirements.txt" ]; then
-          echo "⚠️ 未找到 requirements.txt，正在自动生成..."
           echo "flet" > requirements.txt
           echo "requests" >> requirements.txt
           echo "beautifulsoup4" >> requirements.txt
           echo "pytz" >> requirements.txt
         fi
-        
-        echo "📂 文件准备就绪！"
-        ls -l
 
-    - name: Install dependencies
+    # 4. 安装 Python 依赖
+    - name: Install Dependencies
       run: |
+        pip install --upgrade pip
         pip install -r requirements.txt
 
+    # 5. 设置 Flutter (Flet 需要它)
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.0'
+        channel: 'stable'
 
-    - name: Flet Build APK
+    # 6. 执行打包 (添加 --verbose 查看详细日志)
+    - name: Build APK
       run: |
+        # 预先同意 Android 协议 (防止因等待输入卡死)
+        yes | flutter doctor --android-licenses || true
+        
+        # 开始构建
         flet build apk --verbose
 
+    # 7. 上传结果
     - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v3
       with:
         name: football-fixtures-apk
