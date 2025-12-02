@@ -3,8 +3,6 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -18,9 +16,21 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Check Files & Install
       run: |
-        pip install -r requirements.txt
+        echo "Checking file structure..."
+        ls -R
+        if [ -f "requirements.txt" ]; then
+          echo "Files found in root."
+          pip install -r requirements.txt
+        elif [ -f "football-mobile/requirements.txt" ]; then
+          echo "Files found in subfolder. Moving to root..."
+          cp -r football-mobile/* .
+          pip install -r requirements.txt
+        else
+          echo "Error: requirements.txt not found. Please upload your code files!"
+          exit 1
+        fi
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
